@@ -13,7 +13,11 @@ const app = express();
 const server = createServer(app);
 const io = socketIO(server, {
     cors: {
-        origin: process.env.CORS_ORIGIN || 'http://localhost:5000',
+        origin: [
+            'https://coastal-fitness-project.vercel.app',
+            'http://localhost:3000',
+            'http://localhost:5000'
+        ],
         credentials: true
     }
 });
@@ -29,21 +33,27 @@ app.use(helmet());
 app.use(compression());
 app.use(morgan('dev'));
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5000',
-    credentials: true
+    origin: [
+        'https://coastal-fitness-project.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:5000'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Import routes - FIXED: Changed plural to singular to match actual filenames
+// Import routes
 const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/user');           // Changed from 'users' to 'user'
-const workoutRoutes = require('./routes/workout');     // Changed from 'workouts' to 'workout'
+const userRoutes = require('./routes/user');
+const workoutRoutes = require('./routes/workout');
 const measurementRoutes = require('./routes/measurements');
 const goalRoutes = require('./routes/goals');
 const nutritionRoutes = require('./routes/nutrition');
-const messageRoutes = require('./routes/message');     // Changed from 'messages' to 'message'
-const testRoutes = require('./routes/test');           // Changed from 'tests' to 'test'
+const messageRoutes = require('./routes/message');
+const testRoutes = require('./routes/test');
 
 // API Routes
 app.use('/api/auth', authRoutes);
