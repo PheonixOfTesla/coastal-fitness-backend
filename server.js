@@ -78,7 +78,7 @@ const workoutRoutes = require('./routes/workout');  // Note: singular
 const measurementRoutes = require('./routes/measurements');
 const goalRoutes = require('./routes/goals');
 const nutritionRoutes = require('./routes/nutrition');
-const messageRoutes = require('./routes/messages');
+const messageRoutes = require('./routes/message');
 const testRoutes = require('./routes/test');  // Note: singular
 
 // API Routes
