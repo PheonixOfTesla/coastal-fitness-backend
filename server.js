@@ -71,16 +71,15 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Import routes - Fixed naming to match your files
-const authRoute = require('./routes/auth');
-const userRoute = require('./routes/user');  // Note: singular
-const workoutRoute = require('./routes/workout');  // Note: singular
-const measurementRoute = require('./routes/measurements');
-const goalRoute = require('./routes/goals');
-const nutritionRoute = require('./routes/nutrition');
-const messageRoute = require('./routes/message');
-const testRoute = require('./routes/test');  // Note: singular
-
+// Import routes - Fixed paths to include src/
+const authRoutes = require('./src/routes/auth');
+const userRoutes = require('./src/routes/user');
+const workoutRoutes = require('./src/routes/workout');
+const measurementRoutes = require('./src/routes/measurements');
+const goalRoutes = require('./src/routes/goals');
+const nutritionRoutes = require('./src/routes/nutrition');
+const messageRoutes = require('./src/routes/message');
+const testRoutes = require('./src/routes/test');
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -92,7 +91,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/tests', testRoutes);
 
 // Socket.io handlers
-require('./utils/socketHandlers')(io);
+require('./src/utils/socketHandlers')(io);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
