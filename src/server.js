@@ -173,10 +173,10 @@ app.use((req, res, next) => {
 // ============================================
 // STATIC FILES (Frontend)
 // ============================================
-if (!isDevelopment) {
-    // Serve static files in production
-    app.use(express.static(path.join(__dirname, 'public')));
-}
+// if (!isDevelopment) {
+//     // Serve static files in production
+//     app.use(express.static(path.join(__dirname, 'public')));
+// }
 
 // ============================================
 // API ROUTES
@@ -332,11 +332,11 @@ app.use('/api/*', (req, res) => {
 });
 
 // Serve frontend for all other routes (SPA support)
-if (!isDevelopment) {
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    });
-}
+// if (!isDevelopment) {
+//     app.get('*', (req, res) => {
+//         res.sendFile(path.join(__dirname, 'public', 'index.html'));
+//     });
+// }
 
 // Global error handling middleware
 app.use((err, req, res, next) => {
