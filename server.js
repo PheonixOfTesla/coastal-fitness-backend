@@ -72,14 +72,14 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Import routes - Fixed naming to match your files
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/user');  // Note: singular
-const workoutRoutes = require('./routes/workout');  // Note: singular
-const measurementRoutes = require('./routes/measurements');
-const goalRoutes = require('./routes/goals');
-const nutritionRoutes = require('./routes/nutrition');
-const messageRoutes = require('./routes/message');
-const testRoutes = require('./routes/test');  // Note: singular
+const authRoute = require('./routes/auth');
+const userRoute = require('./routes/user');  // Note: singular
+const workoutRoute = require('./routes/workout');  // Note: singular
+const measurementRoute = require('./routes/measurements');
+const goalRoute = require('./routes/goals');
+const nutritionRoute = require('./routes/nutrition');
+const messageRoute = require('./routes/message');
+const testRoute = require('./routes/test');  // Note: singular
 
 // API Routes
 app.use('/api/auth', authRoutes);
