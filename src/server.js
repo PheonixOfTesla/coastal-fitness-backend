@@ -26,6 +26,7 @@ const allowedOrigins = [
     'http://localhost:5000',
     'http://localhost:5173',
     'https://coastal-fitness.vercel.app',
+    'https://coastal-fitness-app.vercel.app', 
     'https://coastal-fitness.netlify.app',
     process.env.FRONTEND_URL
 ].filter(Boolean);
@@ -144,7 +145,7 @@ const apiLimiter = rateLimit({
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // Limit auth attempts
+    max: 100, // Limit auth attempts
     message: 'Too many authentication attempts, please try again later.',
     skipSuccessfulRequests: true,
 });
