@@ -4,6 +4,36 @@ const User = require('../models/User');
 const { validationResult } = require('express-validator');
 const { generateToken } = require('../config/auth');
 
+// ============================================
+// TEMPORARY HASH GENERATOR - REMOVE AFTER FIXING
+// ============================================
+exports.generateHash = async (req, res) => {
+  try {
+    const password = req.query.password || 'admin123';
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(password, salt);
+    
+    console.log('🔐 Generated new hash:');
+    console.log('Password:', password);
+    console.log('Hash:', hash);
+    console.log('Verification:', bcrypt.compareSync(password, hash));
+    
+    res.json({ 
+      success: true,
+      password: password,
+      hash: hash,
+      verified: bcrypt.compareSync(password, hash),
+      bcryptVersion: require('bcryptjs/package.json').version,
+      instruction: 'Use this hash in MongoDB for the password field'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
+  }
+};
+
 exports.register = async (req, res) => {
   try {
     const { name, email, password, roles = ['client'] } = req.body;
