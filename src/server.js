@@ -11,6 +11,15 @@ const socketIO = require('socket.io');
 require('dotenv').config();
 
 // ============================================
+// BCRYPT DEBUG - REMOVE AFTER FIXING AUTH
+// ============================================
+const bcrypt = require('bcryptjs');
+console.log('🔍 BCRYPT DEBUG INFO:');
+console.log('Version:', require('bcryptjs/package.json').version);
+console.log('Password test:', bcrypt.compareSync('admin123', '$2a$10$eW5qGdhMRI6HuihUW4BXKu5oL7xNMhRTMqfW6pP8veWCKyV5T5BLO'));
+console.log('===================');
+
+// ============================================
 // INITIALIZATION
 // ============================================
 const app = express();
