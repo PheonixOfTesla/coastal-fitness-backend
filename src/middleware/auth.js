@@ -8,17 +8,29 @@ const protect = async (req, res, next) => {
         try {
             token = req.headers.authorization.split(' ')[1];
             const decoded = verifyToken(token);
-            req.user = await User.findById(decoded.id).select('-password');
+            
+            // FIX #1: Use userId not id
+            req.user = await User.findById(decoded.userId).select('-password');
+            
+            // FIX #2: Check if user was found
+            if (!req.user) {
+                console.error('User not found for userId:', decoded.userId);
+                return res.status(401).json({ 
+                    success: false, 
+                    error: 'User not found' 
+                });
+            }
+            
+            console.log('Auth successful for user:', req.user.email);
             next();
         } catch (error) {
+            console.error('Auth middleware error:', error);
             return res.status(401).json({ 
                 success: false, 
                 error: 'Not authorized, token failed' 
             });
         }
-    }
-    
-    if (!token) {
+    } else {
         return res.status(401).json({ 
             success: false, 
             error: 'Not authorized, no token' 
