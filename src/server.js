@@ -71,6 +71,14 @@ const corsOptions = {
 };
 
 // ============================================
+// APPLY CORS FIRST - BEFORE ANY OTHER MIDDLEWARE!
+// ============================================
+app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
+// ============================================
 // SOCKET.IO CONFIGURATION
 // ============================================
 const io = socketIO(server, {
@@ -127,20 +135,12 @@ const connectDB = async () => {
 };
 
 // ============================================
-// SECURITY MIDDLEWARE
+// SECURITY MIDDLEWARE (AFTER CORS!)
 // ============================================
-// Helmet for security headers
+// Helmet for security headers - with relaxed CSP for API
 app.use(helmet({
-    contentSecurityPolicy: isDevelopment ? false : {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "ws:", "wss:", "https:"],
-        },
-    },
-    crossOriginEmbedderPolicy: !isDevelopment
+    contentSecurityPolicy: false, // Disable CSP for API
+    crossOriginEmbedderPolicy: false // Allow cross-origin requests
 }));
 
 // Rate limiting
@@ -169,7 +169,6 @@ app.use('/api/auth/register', authLimiter);
 // ============================================
 app.use(compression());
 app.use(morgan(isDevelopment ? 'dev' : 'combined'));
-app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
