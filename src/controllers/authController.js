@@ -1,39 +1,21 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { validationResult } = require('express-validator');
-const { generateToken } = require('../config/auth');
 
-// ============================================
-// TEMPORARY HASH GENERATOR - REMOVE AFTER FIXING
-// ============================================
-exports.generateHash = async (req, res) => {
-  try {
-    const password = req.query.password || 'admin123';
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(password, salt);
-    
-    console.log('🔐 Generated new hash:');
-    console.log('Password:', password);
-    console.log('Hash:', hash);
-    console.log('Verification:', bcrypt.compareSync(password, hash));
-    
-    res.json({ 
-      success: true,
-      password: password,
-      hash: hash,
-      verified: bcrypt.compareSync(password, hash),
-      bcryptVersion: require('bcryptjs/package.json').version,
-      instruction: 'Use this hash in MongoDB for the password field'
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      error: error.message 
-    });
-  }
+// Generate JWT Token
+const generateToken = (userId, email, roles) => {
+  return jwt.sign(
+    { 
+      userId: userId.toString(), 
+      email: email,
+      roles: roles 
+    },
+    process.env.JWT_SECRET || 'your-secret-key-change-this',
+    { expiresIn: '24h' }
+  );
 };
 
+// REGISTER NEW USER
 exports.register = async (req, res) => {
   try {
     const { name, email, password, roles = ['client'] } = req.body;
@@ -46,7 +28,8 @@ exports.register = async (req, res) => {
       });
     }
     
-    const userExists = await User.findOne({ email });
+    // Check if user exists
+    const userExists = await User.findOne({ email: email.toLowerCase() });
     if (userExists) {
       return res.status(400).json({ 
         success: false,
@@ -54,23 +37,28 @@ exports.register = async (req, res) => {
       });
     }
     
+    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     
+    // Create user
     const user = await User.create({
-      name: name || email.split('@')[0], // Default name if not provided
-      email,
+      name: name || email.split('@')[0],
+      email: email.toLowerCase(),
       password: hashedPassword,
-      roles
+      roles: roles
     });
     
-    const token = generateToken(user._id);
+    // Generate token
+    const token = generateToken(user._id, user.email, user.roles);
     
+    // Send response (without password)
     res.status(201).json({
       success: true,
-      token,
+      token: token,
       user: {
-        id: user._id,
+        _id: user._id,
+        id: user._id, // Both formats for compatibility
         name: user.name,
         email: user.email,
         roles: user.roles
@@ -80,57 +68,42 @@ exports.register = async (req, res) => {
     console.error('Register error:', error);
     res.status(500).json({ 
       success: false,
-      message: error.message 
+      message: 'Registration failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
 
+// LOGIN USER
 exports.login = async (req, res) => {
   try {
-    // Log the entire request body for debugging
-    console.log('Login attempt - Request body:', JSON.stringify(req.body));
-    
-    // Extract only what we need, ignoring extra fields like "name"
+    // Only extract email and password, ignore any other fields
     const { email, password } = req.body;
     
-    // Validate required fields
+    // Validate input
     if (!email || !password) {
-      console.log('Missing credentials:', { email: !!email, password: !!password });
       return res.status(400).json({ 
         success: false,
         message: 'Email and password are required' 
       });
     }
     
-    // Clean the email (trim whitespace)
-    const cleanEmail = email.trim().toLowerCase();
-    console.log('Looking for user with email:', cleanEmail);
-    
-    // Find user with password field included
-    const user = await User.findOne({ email: cleanEmail }).select('+password');
+    // Find user and explicitly include password field
+    const user = await User.findOne({ 
+      email: email.toLowerCase() 
+    }).select('+password');
     
     if (!user) {
-      console.log('No user found with email:', cleanEmail);
       return res.status(401).json({ 
         success: false,
         message: 'Invalid credentials' 
       });
     }
     
-    console.log('User found:', {
-      id: user._id,
-      email: user.email,
-      hasPassword: !!user.password,
-      roles: user.roles
-    });
+    // Check password using the model's method
+    const isPasswordValid = await user.matchPassword(password);
     
-    // Check password
-    const isPasswordMatch = await bcrypt.compare(password, user.password);
-    console.log('Password comparison result:', isPasswordMatch);
-    
-    if (!isPasswordMatch) {
-      // Additional debug info
-      console.log('Password mismatch for user:', cleanEmail);
+    if (!isPasswordValid) {
       return res.status(401).json({ 
         success: false,
         message: 'Invalid credentials' 
@@ -138,20 +111,20 @@ exports.login = async (req, res) => {
     }
     
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.email, user.roles);
     
-    // Update last active
+    // Update user status
     user.lastActive = new Date();
     user.online = true;
     await user.save();
     
-    console.log('Login successful for:', cleanEmail);
-    
+    // Send response (without password)
     res.json({
       success: true,
-      token,
+      token: token,
       user: {
-        id: user._id,
+        _id: user._id,
+        id: user._id, // Both formats for compatibility
         name: user.name,
         email: user.email,
         roles: user.roles
@@ -161,43 +134,136 @@ exports.login = async (req, res) => {
     console.error('Login error:', error);
     res.status(500).json({ 
       success: false,
-      message: 'An error occurred during login',
+      message: 'Login failed',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
 
+// LOGOUT USER
 exports.logout = async (req, res) => {
   try {
-    if (req.user && req.user.id) {
-      await User.findByIdAndUpdate(req.user.id, {
+    // Update user status if authenticated
+    if (req.user && req.user.userId) {
+      await User.findByIdAndUpdate(req.user.userId, {
         online: false,
         lastActive: new Date()
       });
     }
+    
     res.json({ 
-      success: true, 
+      success: true,
       message: 'Logged out successfully' 
     });
   } catch (error) {
     console.error('Logout error:', error);
     res.status(500).json({ 
       success: false,
-      message: 'An error occurred during logout' 
+      message: 'Logout failed' 
     });
   }
 };
 
+// REQUEST PASSWORD RESET
 exports.resetPasswordRequest = async (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Password reset functionality not implemented yet' 
-  });
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Email is required' 
+      });
+    }
+    
+    const user = await User.findOne({ email: email.toLowerCase() });
+    
+    if (!user) {
+      // Don't reveal if user exists or not
+      return res.json({ 
+        success: true,
+        message: 'If the email exists, a reset link has been sent' 
+      });
+    }
+    
+    // TODO: Implement actual password reset logic here
+    // 1. Generate reset token
+    // 2. Save token to user with expiry
+    // 3. Send email with reset link
+    
+    res.json({ 
+      success: true,
+      message: 'If the email exists, a reset link has been sent' 
+    });
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Password reset request failed' 
+    });
+  }
 };
 
+// RESET PASSWORD WITH TOKEN
 exports.resetPassword = async (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Password reset functionality not implemented yet' 
-  });
+  try {
+    const { token, newPassword } = req.body;
+    
+    if (!token || !newPassword) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Token and new password are required' 
+      });
+    }
+    
+    // TODO: Implement actual password reset logic here
+    // 1. Verify reset token
+    // 2. Check token expiry
+    // 3. Hash new password
+    // 4. Update user password
+    // 5. Clear reset token
+    
+    res.json({ 
+      success: true,
+      message: 'Password reset functionality coming soon' 
+    });
+  } catch (error) {
+    console.error('Password reset error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Password reset failed' 
+    });
+  }
+};
+
+// VERIFY TOKEN (for checking if user is still authenticated)
+exports.verifyToken = async (req, res) => {
+  try {
+    // The auth middleware should have already verified the token
+    const user = await User.findById(req.user.userId).select('-password');
+    
+    if (!user) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        roles: user.roles
+      }
+    });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(401).json({ 
+      success: false,
+      message: 'Token verification failed' 
+    });
+  }
 };
