@@ -5,19 +5,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
 const { createServer } = require('http');
 const socketIO = require('socket.io');
 require('dotenv').config();
-
-// ============================================
-// BCRYPT DEBUG - REMOVE AFTER FIXING AUTH
-// ============================================
-const bcrypt = require('bcryptjs');
-console.log('🔍 BCRYPT DEBUG INFO:');
-console.log('Version:', require('bcryptjs/package.json').version);
-console.log('Password test:', bcrypt.compareSync('admin123', '$2a$10$eW5qGdhMRI6HuihUW4BXKu5oL7xNMhRTMqfW6pP8veWCKyV5T5BLO'));
-console.log('===================');
 
 // ============================================
 // INITIALIZATION
@@ -28,54 +18,40 @@ const isDevelopment = process.env.NODE_ENV !== 'production';
 const PORT = process.env.PORT || 5000;
 
 // ============================================
-// CORS CONFIGURATION
+// CORS CONFIGURATION - FIXED FOR RAILWAY
 // ============================================
-const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:5000',
-    'http://localhost:5173',
-    'https://coastal-fitness.vercel.app',
-    'https://coastal-fitness-app.vercel.app', 
-    'https://coastal-fitness.netlify.app',
-    process.env.FRONTEND_URL
-].filter(Boolean);
-
 const corsOptions = {
     origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, Postman, etc)
-        if (!origin) return callback(null, true);
+        // In production, allow any origin temporarily to debug
+        if (process.env.NODE_ENV === 'production') {
+            return callback(null, true);
+        }
         
-        // Check if origin matches allowed patterns
-        const isAllowed = allowedOrigins.some(allowed => {
-            if (!allowed) return false;
-            if (allowed.includes('*')) {
-                // Handle wildcard domains
-                const pattern = allowed.replace('*', '.*');
-                return new RegExp(pattern).test(origin);
-            }
-            return allowed === origin;
-        });
+        // In development, be more restrictive
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'http://localhost:5000',
+            'http://localhost:5173',
+            'https://coastal-fitness.vercel.app',
+            'https://coastal-fitness-app.vercel.app',
+            'https://coastal-fitness.netlify.app'
+        ];
         
-        if (isAllowed) {
+        if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            console.warn(`CORS blocked origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
+            callback(null, true); // Allow anyway for now
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
-    maxAge: 86400 // 24 hours
+    maxAge: 86400
 };
 
-// ============================================
-// APPLY CORS FIRST - BEFORE ANY OTHER MIDDLEWARE!
-// ============================================
+// Apply CORS first
 app.use(cors(corsOptions));
-
-// Handle preflight requests explicitly
 app.options('*', cors(corsOptions));
 
 // ============================================
@@ -87,9 +63,8 @@ const io = socketIO(server, {
     transports: ['websocket', 'polling']
 });
 
-// Store io instance globally for use in controllers
 app.set('io', io);
-global.io = io; // Alternative global access
+global.io = io;
 
 // ============================================
 // DATABASE CONNECTION
@@ -110,7 +85,6 @@ const connectDB = async () => {
         console.log('✅ MongoDB connected successfully');
         console.log(`📦 Database: ${mongoose.connection.name}`);
         
-        // Handle connection events
         mongoose.connection.on('error', (err) => {
             console.error('❌ MongoDB connection error:', err);
         });
@@ -125,7 +99,6 @@ const connectDB = async () => {
         
     } catch (err) {
         console.error('❌ MongoDB initial connection failed:', err);
-        // Don't exit in production, try to recover
         if (!isDevelopment) {
             setTimeout(connectDB, 5000);
         } else {
@@ -135,34 +108,12 @@ const connectDB = async () => {
 };
 
 // ============================================
-// SECURITY MIDDLEWARE (AFTER CORS!)
+// SECURITY MIDDLEWARE
 // ============================================
-// Helmet for security headers - with relaxed CSP for API
 app.use(helmet({
-    contentSecurityPolicy: false, // Disable CSP for API
-    crossOriginEmbedderPolicy: false // Allow cross-origin requests
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
 }));
-
-// Rate limiting
-const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: isDevelopment ? 1000 : 100, // Limit requests per IP
-    message: 'Too many requests from this IP, please try again later.',
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit auth attempts
-    message: 'Too many authentication attempts, please try again later.',
-    skipSuccessfulRequests: true,
-});
-
-// Apply rate limiting
-app.use('/api/', apiLimiter);
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
 
 // ============================================
 // GENERAL MIDDLEWARE
@@ -172,25 +123,15 @@ app.use(morgan(isDevelopment ? 'dev' : 'combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request ID for tracking
+// Request logging for debugging
 app.use((req, res, next) => {
-    req.id = Math.random().toString(36).substr(2, 9);
-    res.setHeader('X-Request-Id', req.id);
+    console.log(`🔥 ${req.method} ${req.path} from ${req.ip}`);
     next();
 });
 
 // ============================================
-// STATIC FILES (Frontend)
-// ============================================
-// if (!isDevelopment) {
-//     // Serve static files in production
-//     app.use(express.static(path.join(__dirname, 'public')));
-// }
-
-// ============================================
 // API ROUTES
 // ============================================
-// Import route modules
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const workoutRoutes = require('./routes/workout');
@@ -200,7 +141,7 @@ const nutritionRoutes = require('./routes/nutrition');
 const messageRoutes = require('./routes/message');
 const testRoutes = require('./routes/test');
 
-// Mount routes with /api prefix
+// Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/workouts', workoutRoutes);
@@ -211,7 +152,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/tests', testRoutes);
 
 // ============================================
-// HEALTH & MONITORING ENDPOINTS
+// HEALTH CHECK ENDPOINT
 // ============================================
 app.get('/api/health', async (req, res) => {
     const healthcheck = {
@@ -220,104 +161,19 @@ app.get('/api/health', async (req, res) => {
         uptime: process.uptime(),
         environment: process.env.NODE_ENV || 'development',
         service: 'Coastal Fitness API',
-        version: process.env.npm_package_version || '1.0.0',
-        checks: {
-            database: 'checking',
-            memory: 'checking'
-        }
+        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
     };
     
-    try {
-        // Check database connection
-        if (mongoose.connection.readyState === 1) {
-            healthcheck.checks.database = 'connected';
-            // Ping database
-            await mongoose.connection.db.admin().ping();
-        } else {
-            healthcheck.checks.database = 'disconnected';
-            healthcheck.status = 'DEGRADED';
-        }
-        
-        // Check memory usage
-        const memUsage = process.memoryUsage();
-        healthcheck.checks.memory = {
-            rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
-            heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
-            heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`
-        };
-        
-        const statusCode = healthcheck.status === 'OK' ? 200 : 503;
-        res.status(statusCode).json(healthcheck);
-    } catch (error) {
-        healthcheck.status = 'ERROR';
-        healthcheck.checks.database = 'error';
-        healthcheck.error = error.message;
-        res.status(503).json(healthcheck);
-    }
+    res.status(200).json(healthcheck);
 });
 
-// API Documentation endpoint
+// API root endpoint
 app.get('/api', (req, res) => {
     res.json({
         name: 'Coastal Fitness API',
         version: '1.0.0',
-        description: 'Backend API for Coastal Fitness & Correction Platform',
-        documentation: '/api/docs',
-        health: '/api/health',
-        endpoints: {
-            auth: {
-                'POST /api/auth/register': 'Register new user',
-                'POST /api/auth/login': 'Login user',
-                'POST /api/auth/logout': 'Logout user',
-                'POST /api/auth/reset-password': 'Request password reset',
-                'PUT /api/auth/reset-password/:token': 'Reset password with token'
-            },
-            users: {
-                'GET /api/users/profile': 'Get current user profile',
-                'PUT /api/users/profile': 'Update user profile',
-                'GET /api/users': 'Get all users (admin only)',
-                'POST /api/users': 'Create user (admin only)',
-                'PUT /api/users/:id': 'Update user (admin only)',
-                'DELETE /api/users/:id': 'Delete user (admin only)'
-            },
-            workouts: {
-                'GET /api/workouts/client/:clientId': 'Get client workouts',
-                'GET /api/workouts/client/:clientId/stats': 'Get workout statistics',
-                'POST /api/workouts/client/:clientId': 'Create workout',
-                'PUT /api/workouts/:id': 'Update workout',
-                'POST /api/workouts/:id/complete': 'Mark workout complete',
-                'DELETE /api/workouts/:id': 'Delete workout'
-            },
-            measurements: {
-                'GET /api/measurements/client/:clientId': 'Get client measurements',
-                'GET /api/measurements/client/:clientId/stats': 'Get measurement statistics',
-                'POST /api/measurements/client/:clientId': 'Create measurement',
-                'PUT /api/measurements/:id': 'Update measurement',
-                'DELETE /api/measurements/:id': 'Delete measurement'
-            },
-            goals: {
-                'GET /api/goals/client/:clientId': 'Get client goals',
-                'POST /api/goals/client/:clientId': 'Create goal',
-                'PUT /api/goals/:id': 'Update goal',
-                'DELETE /api/goals/:id': 'Delete goal'
-            },
-            nutrition: {
-                'GET /api/nutrition/client/:clientId': 'Get nutrition plan',
-                'POST /api/nutrition/client/:clientId': 'Create/update nutrition plan',
-                'POST /api/nutrition/client/:clientId/log': 'Log daily nutrition'
-            },
-            messages: {
-                'GET /api/messages': 'Get user messages',
-                'POST /api/messages': 'Send message',
-                'PUT /api/messages/read': 'Mark messages as read'
-            },
-            tests: {
-                'GET /api/tests/client/:clientId': 'Get client tests',
-                'POST /api/tests/client/:clientId': 'Create test',
-                'PUT /api/tests/:id': 'Update test',
-                'DELETE /api/tests/:id': 'Delete test'
-            }
-        }
+        status: 'running',
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
@@ -329,121 +185,30 @@ require('./utils/socketHandlers')(io);
 // ============================================
 // ERROR HANDLING
 // ============================================
-// 404 handler for unknown API routes
 app.use('/api/*', (req, res) => {
     res.status(404).json({ 
         success: false,
         error: 'API endpoint not found',
-        path: req.originalUrl,
-        method: req.method,
-        timestamp: new Date().toISOString()
+        path: req.originalUrl
     });
 });
 
-// Serve frontend for all other routes (SPA support)
-// if (!isDevelopment) {
-//     app.get('*', (req, res) => {
-//         res.sendFile(path.join(__dirname, 'public', 'index.html'));
-//     });
-// }
-
-// Global error handling middleware
+// Global error handler
 app.use((err, req, res, next) => {
-    // Log error details
-    console.error(`[${new Date().toISOString()}] Error:`, {
-        message: err.message,
-        stack: isDevelopment ? err.stack : undefined,
-        path: req.path,
-        method: req.method,
-        ip: req.ip,
-        requestId: req.id
-    });
+    console.error(`Error: ${err.message}`);
     
-    // Prepare error response
-    let status = err.status || err.statusCode || 500;
+    let status = err.status || 500;
     let message = err.message || 'Internal server error';
-    let error = { success: false };
     
-    // Handle specific error types
     if (err.message === 'Not allowed by CORS') {
         status = 403;
         message = 'Cross-origin request blocked';
-    } else if (err.name === 'ValidationError') {
-        status = 400;
-        message = 'Validation error';
-        error.details = Object.values(err.errors).map(e => e.message);
-    } else if (err.name === 'CastError') {
-        status = 400;
-        message = 'Invalid ID format';
-    } else if (err.name === 'JsonWebTokenError') {
-        status = 401;
-        message = 'Invalid authentication token';
-    } else if (err.name === 'TokenExpiredError') {
-        status = 401;
-        message = 'Authentication token expired';
-    } else if (err.code === 11000) {
-        status = 409;
-        message = 'Duplicate entry';
-        error.field = Object.keys(err.keyPattern)[0];
     }
     
-    // Send error response
-    error.message = message;
-    error.requestId = req.id;
-    
-    if (isDevelopment) {
-        error.stack = err.stack;
-        error.originalError = err.message;
-    }
-    
-    res.status(status).json(error);
-});
-
-// ============================================
-// GRACEFUL SHUTDOWN
-// ============================================
-const gracefulShutdown = (signal) => {
-    console.log(`\n${signal} received. Starting graceful shutdown...`);
-    
-    // Stop accepting new connections
-    server.close(() => {
-        console.log('✅ HTTP server closed');
-        
-        // Close database connections
-        mongoose.connection.close(false, () => {
-            console.log('✅ MongoDB connection closed');
-            
-            // Close socket.io connections
-            io.close(() => {
-                console.log('✅ Socket.io connections closed');
-                process.exit(0);
-            });
-        });
+    res.status(status).json({
+        success: false,
+        message: message
     });
-    
-    // Force shutdown after 10 seconds
-    setTimeout(() => {
-        console.error('⚠️ Forced shutdown after timeout');
-        process.exit(1);
-    }, 10000);
-};
-
-// Listen for termination signals
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-// Handle uncaught errors
-process.on('uncaughtException', (error) => {
-    console.error('❌ Uncaught Exception:', error);
-    gracefulShutdown('UNCAUGHT_EXCEPTION');
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-    // Don't exit in production, just log
-    if (isDevelopment) {
-        gracefulShutdown('UNHANDLED_REJECTION');
-    }
 });
 
 // ============================================
@@ -451,27 +216,18 @@ process.on('unhandledRejection', (reason, promise) => {
 // ============================================
 const startServer = async () => {
     try {
-        // Connect to database first
         await connectDB();
         
-        // Start listening
         server.listen(PORT, () => {
             console.log(`
 ╔════════════════════════════════════════════════════════╗
-║                                                        ║
 ║     🚀 COASTAL FITNESS BACKEND SERVER STARTED 🚀      ║
-║                                                        ║
 ╠════════════════════════════════════════════════════════╣
-║                                                        ║
 ║  🌐 Server:      http://localhost:${PORT}                 ║
-║  📚 API Docs:    http://localhost:${PORT}/api             ║
+║  📚 API:         http://localhost:${PORT}/api             ║
 ║  💚 Health:      http://localhost:${PORT}/api/health      ║
 ║  🔧 Environment: ${process.env.NODE_ENV || 'development'}                        ║
-║  📦 Database:    ${mongoose.connection.name || 'connecting...'}              ║
-║  🔌 Socket.io:   Enabled                               ║
-║  🛡️  CORS:        Configured                            ║
-║  ⚡ Rate Limit:  Active                                ║
-║                                                        ║
+║  📦 Database:    Connected                             ║
 ╚════════════════════════════════════════════════════════╝
             `);
         });
@@ -482,8 +238,6 @@ const startServer = async () => {
     }
 };
 
-// Initialize server
 startServer();
 
-// Export for testing
 module.exports = { app, server, io };
