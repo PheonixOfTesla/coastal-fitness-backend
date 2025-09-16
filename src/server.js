@@ -140,7 +140,7 @@ const goalRoutes = require('./routes/goals');
 const nutritionRoutes = require('./routes/nutrition');
 const messageRoutes = require('./routes/message');
 const testRoutes = require('./routes/test');
-const exerciseRoutes = require('./routes/exercise');
+const exerciseRoutes = require('./routes/exercises');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
