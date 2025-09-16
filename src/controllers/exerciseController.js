@@ -42,7 +42,7 @@ exports.createExercise = async (req, res) => {
   try {
     const exercise = await Exercise.create({
       ...req.body,
-      createdBy: req.user.id
+      createdBy: req.user._id
     });
     res.status(201).json({ data: exercise });
   } catch (error) {
