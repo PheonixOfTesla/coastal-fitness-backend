@@ -4,6 +4,11 @@ const User = require('../models/User');
 const protect = async (req, res, next) => {
     let token;
     
+// Allow OPTIONS requests to pass through
+    if (req.method === 'OPTIONS') {
+        return next();
+    }
+    
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
             token = req.headers.authorization.split(' ')[1];
