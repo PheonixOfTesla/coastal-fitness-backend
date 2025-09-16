@@ -140,6 +140,7 @@ const goalRoutes = require('./routes/goals');
 const nutritionRoutes = require('./routes/nutrition');
 const messageRoutes = require('./routes/message');
 const testRoutes = require('./routes/test');
+const exerciseRoutes = require('./routes/exercise');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -150,6 +151,7 @@ app.use('/api/goals', goalRoutes);
 app.use('/api/nutrition', nutritionRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/tests', testRoutes);
+app.use('/api/exercises', exerciseRoutes);
 
 // ============================================
 // HEALTH CHECK ENDPOINT
