@@ -17,17 +17,29 @@ const protect = async (req, res, next) => {
             
             console.log('Token received:', token ? 'Yes' : 'No');
             
-            // Verify token
+            // Verify token - use the same secret that authController uses
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-this');
             
             console.log('Decoded token:', decoded);
             
-            // Find user - the token has userId field
-            req.user = await User.findById(decoded.userId).select('-password');
+            // Handle both possible token formats
+            // The token might have either 'userId' or 'id' field
+            const userIdToFind = decoded.userId || decoded.id;
+            
+            if (!userIdToFind) {
+                console.error('No user ID found in token:', decoded);
+                return res.status(401).json({ 
+                    success: false, 
+                    error: 'Invalid token format' 
+                });
+            }
+            
+            // Find user
+            req.user = await User.findById(userIdToFind).select('-password');
             
             // Check if user was found
             if (!req.user) {
-                console.error('User not found for userId:', decoded.userId);
+                console.error('User not found for ID:', userIdToFind);
                 return res.status(401).json({ 
                     success: false, 
                     error: 'User not found' 
@@ -36,11 +48,28 @@ const protect = async (req, res, next) => {
             
             // Add the user ID in both formats for compatibility
             req.user.id = req.user._id;
+            req.user.userId = req.user._id;
             
             console.log('Auth successful for user:', req.user.email);
             next();
         } catch (error) {
             console.error('Auth middleware error:', error.message);
+            
+            // Check if it's a JWT specific error
+            if (error.name === 'JsonWebTokenError') {
+                return res.status(401).json({ 
+                    success: false, 
+                    error: 'Invalid token' 
+                });
+            }
+            
+            if (error.name === 'TokenExpiredError') {
+                return res.status(401).json({ 
+                    success: false, 
+                    error: 'Token expired, please login again' 
+                });
+            }
+            
             return res.status(401).json({ 
                 success: false, 
                 error: 'Not authorized, token failed',
