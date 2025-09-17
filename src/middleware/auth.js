@@ -21,6 +21,7 @@ const protect = async (req, res, next) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-this');
             
             console.log('Decoded token:', decoded);
+            console.log('Roles from token:', decoded.roles);
             
             // Handle both possible token formats
             // The token might have either 'userId' or 'id' field
@@ -46,11 +47,24 @@ const protect = async (req, res, next) => {
                 });
             }
             
+            // IMPORTANT: If roles are in the token but not in the database user,
+            // use the roles from the token (they were set during login)
+            if (decoded.roles && decoded.roles.length > 0) {
+                req.user.roles = decoded.roles;
+                console.log('Using roles from token:', decoded.roles);
+            } else if (!req.user.roles || req.user.roles.length === 0) {
+                // If no roles in token or user, something is wrong
+                console.error('No roles found for user');
+                req.user.roles = ['client']; // Default fallback
+            }
+            
             // Add the user ID in both formats for compatibility
             req.user.id = req.user._id;
             req.user.userId = req.user._id;
             
             console.log('Auth successful for user:', req.user.email);
+            console.log('User roles:', req.user.roles);
+            
             next();
         } catch (error) {
             console.error('Auth middleware error:', error.message);
