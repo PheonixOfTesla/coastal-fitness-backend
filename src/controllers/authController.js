@@ -2,11 +2,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Generate JWT Token
+// STANDARDIZED JWT Token Generation
 const generateToken = (userId, email, roles) => {
   return jwt.sign(
     { 
-      userId: userId.toString(), 
+      id: userId.toString(),        // ALWAYS include 'id'
+      userId: userId.toString(),    // ALWAYS include 'userId'
       email: email,
       roles: roles 
     },
@@ -49,7 +50,7 @@ exports.register = async (req, res) => {
       roles: roles
     });
     
-    // Generate token
+    // Generate token with standardized format
     const token = generateToken(user._id, user.email, user.roles);
     
     // Send response (without password)
@@ -110,7 +111,7 @@ exports.login = async (req, res) => {
       });
     }
     
-    // Generate token
+    // Generate token with standardized format
     const token = generateToken(user._id, user.email, user.roles);
     
     // Update user status
