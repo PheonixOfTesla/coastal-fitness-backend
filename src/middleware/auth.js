@@ -31,7 +31,7 @@ const protect = async (req, res, next) => {
                 console.error('No user ID found in token:', decoded);
                 return res.status(401).json({ 
                     success: false, 
-                    error: 'Invalid token format' 
+                    message: 'Invalid token format' 
                 });
             }
             
@@ -43,7 +43,7 @@ const protect = async (req, res, next) => {
                 console.error('User not found for ID:', userIdToFind);
                 return res.status(401).json({ 
                     success: false, 
-                    error: 'User not found' 
+                    message: 'User not found' 
                 });
             }
             
@@ -58,12 +58,14 @@ const protect = async (req, res, next) => {
                 req.user.roles = ['client']; // Default fallback
             }
             
-            // Add the user ID in both formats for compatibility
-            req.user.id = req.user._id;
-            req.user.userId = req.user._id;
+            // FIXED: Standardize user ID assignment - ALWAYS set both formats
+            req.user.id = req.user._id.toString();
+            req.user.userId = req.user._id.toString();
+            // Keep _id as well for MongoDB operations
             
             console.log('Auth successful for user:', req.user.email);
             console.log('User roles:', req.user.roles);
+            console.log('User ID formats - id:', req.user.id, 'userId:', req.user.userId);
             
             next();
         } catch (error) {
@@ -73,20 +75,20 @@ const protect = async (req, res, next) => {
             if (error.name === 'JsonWebTokenError') {
                 return res.status(401).json({ 
                     success: false, 
-                    error: 'Invalid token' 
+                    message: 'Invalid token' 
                 });
             }
             
             if (error.name === 'TokenExpiredError') {
                 return res.status(401).json({ 
                     success: false, 
-                    error: 'Token expired, please login again' 
+                    message: 'Token expired, please login again' 
                 });
             }
             
             return res.status(401).json({ 
                 success: false, 
-                error: 'Not authorized, token failed',
+                message: 'Not authorized, token failed',
                 details: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
@@ -94,7 +96,7 @@ const protect = async (req, res, next) => {
         console.log('No token provided in request');
         return res.status(401).json({ 
             success: false, 
-            error: 'Not authorized, no token' 
+            message: 'Not authorized, no token' 
         });
     }
 };
