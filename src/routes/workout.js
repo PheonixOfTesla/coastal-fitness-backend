@@ -11,15 +11,15 @@ router.get('/client/:clientId', protect, workoutController.getWorkoutsByClient);
 router.get('/client/:clientId/stats', protect, workoutController.getWorkoutStats);
 
 // Create workout (specialists/admins only)
-router.post('/client/:clientId', protect, checkRole('specialist', 'admin', 'owner'), workoutController.createWorkout);
+router.post('/client/:clientId', protect, checkRole(['specialist', 'admin', 'owner']), workoutController.createWorkout);
 
-// Update workout
+// Update workout - FIX: Add this route
 router.put('/:id', protect, workoutController.updateWorkout);
 
-// Complete workout (client marks as done)
+// Complete workout - FIX: Simplified path without clientId
 router.post('/:id/complete', protect, workoutController.completeWorkout);
 
 // Delete workout (specialists/admins only)
-router.delete('/:id', protect, checkRole('specialist', 'admin', 'owner'), workoutController.deleteWorkout);
+router.delete('/:id', protect, checkRole(['specialist', 'admin', 'owner']), workoutController.deleteWorkout);
 
 module.exports = router;
