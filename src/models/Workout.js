@@ -5,20 +5,30 @@ const exerciseSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    exerciseId: {  // Reference to Exercise Library
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Exercise'
+    },
     sets: Number,
     reps: Number,
     weight: Number,
-    actualSets: Number,
-    actualReps: Number,
-    actualWeight: Number,
-    painLevel: {
-        type: Number,
-        min: 0,
-        max: 5
+    restTime: { type: Number, default: 60 },
+    tempo: String,  // e.g., "2-1-2-1" 
+    notes: String,
+    youtubeLink: String,
+    grouping: {
+        type: String,
+        enum: ['none', 'superset', 'triset'],
+        default: 'none'
     },
-    specialistNote: String,
-    imageUrl: String,
-    videoUrl: String
+    groupId: Number,
+    // Track actual performance
+    completed: { type: Boolean, default: false },
+    actualSets: [{
+        reps: Number,
+        weight: Number,
+        difficulty: { type: Number, min: 1, max: 5 }
+    }]
 });
 
 const workoutSchema = new mongoose.Schema({
@@ -36,12 +46,7 @@ const workoutSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
-    createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
-    scheduledDate: String,
+    scheduledDate: Date,
     exercises: [exerciseSchema],
     restBetweenSets: {
         type: Number,
@@ -56,6 +61,7 @@ const workoutSchema = new mongoose.Schema({
         default: false
     },
     completedDate: Date,
+    duration: Number,  // in minutes
     moodFeedback: {
         type: Number,
         min: 1,
