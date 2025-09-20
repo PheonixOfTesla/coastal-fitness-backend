@@ -71,10 +71,13 @@ exports.createWorkout = async (req, res) => {
   }
 };
 
-// FIXED: Added missing completeWorkout method
+// FIXED: Added missing completeWorkout method - handles both route formats
 exports.completeWorkout = async (req, res) => {
   try {
-    const workout = await Workout.findById(req.params.id);
+    // Handle both route formats - /workouts/:id/complete OR /workouts/client/:clientId/:workoutId/complete
+    const workoutId = req.params.id || req.params.workoutId;
+    
+    const workout = await Workout.findById(workoutId);
     
     if (!workout) {
       return res.status(404).json({ 
