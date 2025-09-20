@@ -47,6 +47,64 @@ exports.getWorkoutById = async (req, res) => {
   }
 };
 
+// FIXED: Added missing createWorkout method
+exports.createWorkout = async (req, res) => {
+  try {
+    const workoutData = {
+      ...req.body,
+      clientId: req.params.clientId,
+      assignedBy: req.user.id  // Use consistent .id from auth middleware
+    };
+    
+    const workout = await Workout.create(workoutData);
+    
+    res.status(201).json({
+      success: true,
+      data: workout,
+      message: 'Workout created successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
+// FIXED: Added missing completeWorkout method
+exports.completeWorkout = async (req, res) => {
+  try {
+    const workout = await Workout.findById(req.params.id);
+    
+    if (!workout) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Workout not found' 
+      });
+    }
+    
+    // Update workout completion status
+    workout.completed = true;
+    workout.completedDate = new Date();
+    workout.duration = req.body.duration || 0;
+    workout.moodFeedback = req.body.moodFeedback || 3;
+    workout.notes = req.body.notes || '';
+    
+    await workout.save();
+    
+    res.json({
+      success: true,
+      data: workout,
+      message: 'Workout completed successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
 exports.startWorkout = async (req, res) => {
   try {
     const workout = await Workout.findById(req.params.id)
@@ -103,6 +161,66 @@ exports.updateExerciseProgress = async (req, res) => {
       success: true,
       data: workout,
       message: 'Exercise progress updated'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
+// FIXED: Added updateWorkout method for editing workouts
+exports.updateWorkout = async (req, res) => {
+  try {
+    const workout = await Workout.findOneAndUpdate(
+      { 
+        _id: req.params.workoutId,
+        clientId: req.params.clientId 
+      },
+      req.body,
+      { new: true, runValidators: true }
+    );
+    
+    if (!workout) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Workout not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: workout,
+      message: 'Workout updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
+// FIXED: Added deleteWorkout method
+exports.deleteWorkout = async (req, res) => {
+  try {
+    const workout = await Workout.findOneAndDelete({
+      _id: req.params.workoutId,
+      clientId: req.params.clientId
+    });
+    
+    if (!workout) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Workout not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Workout deleted successfully',
+      data: workout
     });
   } catch (error) {
     res.status(500).json({ 
