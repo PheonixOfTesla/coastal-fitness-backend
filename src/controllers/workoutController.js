@@ -4,12 +4,10 @@ const Exercise = require('../models/Exercise');
 exports.getWorkoutsByClient = async (req, res) => {
   try {
     const workouts = await Workout.find({ 
-      clientId: req.params.clientId  // FIXED: Using clientId to match model
+      clientId: req.params.clientId
     })
-    .populate('exercises.exerciseId')
     .sort('-createdAt');
     
-    // Return array directly for frontend compatibility
     res.json(workouts);
   } catch (error) {
     res.status(500).json({ 
@@ -24,7 +22,7 @@ exports.updateWorkout = async (req, res) => {
     const workout = await Workout.findOneAndUpdate(
       { 
         _id: req.params.workoutId,
-        clientId: req.params.clientId  // FIXED: Using clientId
+        clientId: req.params.clientId
       },
       req.body,
       { new: true, runValidators: true }
@@ -54,7 +52,7 @@ exports.deleteWorkout = async (req, res) => {
   try {
     const workout = await Workout.findOneAndDelete({
       _id: req.params.workoutId,
-      clientId: req.params.clientId  // FIXED: Using clientId
+      clientId: req.params.clientId
     });
     
     if (!workout) {
@@ -80,8 +78,7 @@ exports.deleteWorkout = async (req, res) => {
 exports.getWorkoutById = async (req, res) => {
   try {
     const workout = await Workout.findById(req.params.id)
-      .populate('exercises.exerciseId')
-      .populate('clientId', 'name email')  // FIXED: Changed from 'client' to 'clientId'
+      .populate('clientId', 'name email')
       .populate('assignedBy', 'name');
     
     if (!workout) {
@@ -107,7 +104,7 @@ exports.createWorkout = async (req, res) => {
   try {
     const workoutData = {
       ...req.body,
-      clientId: req.params.clientId,  // Already correct in your model
+      clientId: req.params.clientId,
       assignedBy: req.user.id
     };
     
@@ -162,11 +159,7 @@ exports.completeWorkout = async (req, res) => {
 
 exports.startWorkout = async (req, res) => {
   try {
-    const workout = await Workout.findById(req.params.id)
-      .populate({
-        path: 'exercises.exerciseId',
-        select: 'name description instructions tips commonMistakes imageUrl videoUrl muscleCategory secondaryMuscles difficulty equipmentNeeded'
-      });
+    const workout = await Workout.findById(req.params.id);
     
     if (!workout) {
       return res.status(404).json({ 
