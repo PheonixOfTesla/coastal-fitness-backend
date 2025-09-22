@@ -13,12 +13,11 @@ const exerciseSchema = new mongoose.Schema({
         max: [20, 'Sets cannot exceed 20']
     },
     reps: {
-        type: String,  // Changed to String to support ranges like "8-12"
+        type: String,
         required: [true, 'Reps are required'],
         trim: true,
         validate: {
             validator: function(v) {
-                // Allow single numbers, ranges (8-12), or time-based (30s)
                 return /^(\d+(-\d+)?|[\d\s]+(s|sec|seconds|min|minutes)?)$/i.test(v);
             },
             message: 'Reps must be a number, range (8-12), or time (30s)'
@@ -29,7 +28,7 @@ const exerciseSchema = new mongoose.Schema({
         default: 0,
         min: [0, 'Weight cannot be negative']
     },
-    holdTime: {  // NEW: For isometric exercises (in seconds)
+    holdTime: {
         type: Number,
         default: 0,
         min: [0, 'Hold time cannot be negative'],
@@ -47,7 +46,6 @@ const exerciseSchema = new mongoose.Schema({
     },
     groupId: String,
     groupType: String,
-    // Legacy field - kept for backward compatibility but not used in new UI
     youtubeLink: String
 });
 
@@ -58,7 +56,7 @@ const workoutSchema = new mongoose.Schema({
         trim: true,
         maxlength: [100, 'Workout name cannot exceed 100 characters']
     },
-    client: {
+    clientId: {  // <-- CHANGED from 'client' to 'clientId'
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: [true, 'Client is required']
@@ -68,11 +66,14 @@ const workoutSchema = new mongoose.Schema({
         ref: 'User',
         required: [true, 'Creator is required']
     },
+    assignedBy: {  // <-- ADD THIS FIELD to match other models
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
     scheduledDate: {
         type: Date,
         validate: {
             validator: function(v) {
-                // Allow null/undefined or valid dates
                 return !v || v instanceof Date;
             },
             message: 'Invalid scheduled date'
@@ -87,13 +88,12 @@ const workoutSchema = new mongoose.Schema({
             message: 'At least one exercise is required'
         }
     },
-    youtubeLink: {  // NEW: Moved to workout level
+    youtubeLink: {
         type: String,
         default: '',
         trim: true,
         validate: {
             validator: function(v) {
-                // Allow empty string or valid YouTube/video URLs
                 if (!v || v === '') return true;
                 return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\/.+/.test(v);
             },
@@ -108,7 +108,6 @@ const workoutSchema = new mongoose.Schema({
         type: Date,
         validate: {
             validator: function(v) {
-                // If workout is completed, completedAt should be set
                 if (this.completed && !v) return false;
                 return true;
             },
@@ -126,7 +125,7 @@ const workoutSchema = new mongoose.Schema({
         trim: true
     },
     duration: {
-        type: Number, // in minutes
+        type: Number,
         min: [0, 'Duration cannot be negative'],
         max: [480, 'Duration cannot exceed 8 hours']
     },
@@ -156,7 +155,6 @@ const workoutSchema = new mongoose.Schema({
             default: Date.now
         }
     }],
-    // For recurring workouts
     repeatWeekly: {
         type: Boolean,
         default: false
@@ -169,31 +167,27 @@ const workoutSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Indexes for performance
-workoutSchema.index({ client: 1, scheduledDate: -1 });
-workoutSchema.index({ client: 1, completed: 1 });
+// Update indexes to use clientId
+workoutSchema.index({ clientId: 1, scheduledDate: -1 });  // <-- CHANGED
+workoutSchema.index({ clientId: 1, completed: 1 });       // <-- CHANGED
 workoutSchema.index({ createdBy: 1 });
-workoutSchema.index({ client: 1, createdAt: -1 });
+workoutSchema.index({ clientId: 1, createdAt: -1 });      // <-- CHANGED
 
-// Virtual for exercise count
+// Rest of the schema stays the same...
 workoutSchema.virtual('exerciseCount').get(function() {
     return this.exercises ? this.exercises.length : 0;
 });
 
-// Virtual for total volume
 workoutSchema.virtual('totalVolume').get(function() {
     if (!this.exercises) return 0;
     return this.exercises.reduce((total, exercise) => {
-        // Parse reps to handle ranges
         let repCount = 0;
         if (exercise.reps) {
             const repsStr = exercise.reps.toString();
             if (repsStr.includes('-')) {
-                // For ranges like "8-12", use the average
                 const [min, max] = repsStr.split('-').map(Number);
                 repCount = (min + max) / 2;
             } else {
-                // For single numbers
                 repCount = parseInt(repsStr) || 0;
             }
         }
@@ -201,7 +195,6 @@ workoutSchema.virtual('totalVolume').get(function() {
     }, 0);
 });
 
-// Method to mark workout as complete
 workoutSchema.methods.markComplete = function(moodFeedback, notes, duration) {
     this.completed = true;
     this.completedAt = new Date();
@@ -211,7 +204,6 @@ workoutSchema.methods.markComplete = function(moodFeedback, notes, duration) {
     return this.save();
 };
 
-// Method to clone workout for recurring
 workoutSchema.methods.cloneForDate = function(newDate) {
     const cloned = this.toObject();
     delete cloned._id;
@@ -226,7 +218,6 @@ workoutSchema.methods.cloneForDate = function(newDate) {
     return cloned;
 };
 
-// Ensure virtuals are included in JSON
 workoutSchema.set('toJSON', { virtuals: true });
 
 module.exports = mongoose.model('Workout', workoutSchema);
