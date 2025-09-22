@@ -4,15 +4,13 @@ const Exercise = require('../models/Exercise');
 exports.getWorkoutsByClient = async (req, res) => {
   try {
     const workouts = await Workout.find({ 
-      client: req.params.clientId  // <-- CHANGED FROM clientId TO client
+      clientId: req.params.clientId  // FIXED: Using clientId to match model
     })
     .populate('exercises.exerciseId')
     .sort('-createdAt');
     
-    res.json({
-      success: true,
-      data: workouts
-    });
+    // Return array directly for frontend compatibility
+    res.json(workouts);
   } catch (error) {
     res.status(500).json({ 
       success: false,
@@ -21,14 +19,12 @@ exports.getWorkoutsByClient = async (req, res) => {
   }
 };
 
-// Also update other methods that query by client:
-
 exports.updateWorkout = async (req, res) => {
   try {
     const workout = await Workout.findOneAndUpdate(
       { 
         _id: req.params.workoutId,
-        client: req.params.clientId  // <-- CHANGED FROM clientId TO client
+        clientId: req.params.clientId  // FIXED: Using clientId
       },
       req.body,
       { new: true, runValidators: true }
@@ -58,7 +54,7 @@ exports.deleteWorkout = async (req, res) => {
   try {
     const workout = await Workout.findOneAndDelete({
       _id: req.params.workoutId,
-      client: req.params.clientId  // <-- CHANGED FROM clientId TO client
+      clientId: req.params.clientId  // FIXED: Using clientId
     });
     
     if (!workout) {
@@ -81,12 +77,11 @@ exports.deleteWorkout = async (req, res) => {
   }
 };
 
-// Keep the rest of the methods the same...
 exports.getWorkoutById = async (req, res) => {
   try {
     const workout = await Workout.findById(req.params.id)
       .populate('exercises.exerciseId')
-      .populate('client', 'name email')  // <-- Note: This was already correct
+      .populate('clientId', 'name email')  // FIXED: Changed from 'client' to 'clientId'
       .populate('assignedBy', 'name');
     
     if (!workout) {
@@ -112,7 +107,7 @@ exports.createWorkout = async (req, res) => {
   try {
     const workoutData = {
       ...req.body,
-      client: req.params.clientId,  // <-- This was already correct
+      clientId: req.params.clientId,  // Already correct in your model
       assignedBy: req.user.id
     };
     
