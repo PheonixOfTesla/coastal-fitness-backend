@@ -4,9 +4,9 @@ const Exercise = require('../models/Exercise');
 exports.getWorkoutsByClient = async (req, res) => {
   try {
     const workouts = await Workout.find({ 
-      clientId: req.params.clientId 
+      client: req.params.clientId  // <-- CHANGED FROM clientId TO client
     })
-    .populate('exercises.exerciseId')  // Populate exercise details from library
+    .populate('exercises.exerciseId')
     .sort('-createdAt');
     
     res.json({
@@ -21,11 +21,72 @@ exports.getWorkoutsByClient = async (req, res) => {
   }
 };
 
+// Also update other methods that query by client:
+
+exports.updateWorkout = async (req, res) => {
+  try {
+    const workout = await Workout.findOneAndUpdate(
+      { 
+        _id: req.params.workoutId,
+        client: req.params.clientId  // <-- CHANGED FROM clientId TO client
+      },
+      req.body,
+      { new: true, runValidators: true }
+    );
+    
+    if (!workout) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Workout not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: workout,
+      message: 'Workout updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
+exports.deleteWorkout = async (req, res) => {
+  try {
+    const workout = await Workout.findOneAndDelete({
+      _id: req.params.workoutId,
+      client: req.params.clientId  // <-- CHANGED FROM clientId TO client
+    });
+    
+    if (!workout) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Workout not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Workout deleted successfully',
+      data: workout
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
+  }
+};
+
+// Keep the rest of the methods the same...
 exports.getWorkoutById = async (req, res) => {
   try {
     const workout = await Workout.findById(req.params.id)
-      .populate('exercises.exerciseId')  // Get full exercise details
-      .populate('clientId', 'name email')
+      .populate('exercises.exerciseId')
+      .populate('client', 'name email')  // <-- Note: This was already correct
       .populate('assignedBy', 'name');
     
     if (!workout) {
@@ -47,13 +108,12 @@ exports.getWorkoutById = async (req, res) => {
   }
 };
 
-// FIXED: Added missing createWorkout method
 exports.createWorkout = async (req, res) => {
   try {
     const workoutData = {
       ...req.body,
-      clientId: req.params.clientId,
-      assignedBy: req.user.id  // Use consistent .id from auth middleware
+      client: req.params.clientId,  // <-- This was already correct
+      assignedBy: req.user.id
     };
     
     const workout = await Workout.create(workoutData);
@@ -71,10 +131,8 @@ exports.createWorkout = async (req, res) => {
   }
 };
 
-// FIXED: Added missing completeWorkout method - handles both route formats
 exports.completeWorkout = async (req, res) => {
   try {
-    // Handle both route formats - /workouts/:id/complete OR /workouts/client/:clientId/:workoutId/complete
     const workoutId = req.params.id || req.params.workoutId;
     
     const workout = await Workout.findById(workoutId);
@@ -86,7 +144,6 @@ exports.completeWorkout = async (req, res) => {
       });
     }
     
-    // Update workout completion status
     workout.completed = true;
     workout.completedDate = new Date();
     workout.duration = req.body.duration || 0;
@@ -123,7 +180,6 @@ exports.startWorkout = async (req, res) => {
       });
     }
     
-    // Mark workout as in progress
     workout.startedAt = new Date();
     await workout.save();
     
@@ -152,7 +208,6 @@ exports.updateExerciseProgress = async (req, res) => {
       });
     }
     
-    // Update the specific exercise's actual performance
     if (workout.exercises[exerciseIndex]) {
       workout.exercises[exerciseIndex].actualSets.push(setData);
       workout.exercises[exerciseIndex].completed = true;
@@ -164,66 +219,6 @@ exports.updateExerciseProgress = async (req, res) => {
       success: true,
       data: workout,
       message: 'Exercise progress updated'
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      message: error.message 
-    });
-  }
-};
-
-// FIXED: Added updateWorkout method for editing workouts
-exports.updateWorkout = async (req, res) => {
-  try {
-    const workout = await Workout.findOneAndUpdate(
-      { 
-        _id: req.params.workoutId,
-        clientId: req.params.clientId 
-      },
-      req.body,
-      { new: true, runValidators: true }
-    );
-    
-    if (!workout) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Workout not found' 
-      });
-    }
-    
-    res.json({
-      success: true,
-      data: workout,
-      message: 'Workout updated successfully'
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      message: error.message 
-    });
-  }
-};
-
-// FIXED: Added deleteWorkout method
-exports.deleteWorkout = async (req, res) => {
-  try {
-    const workout = await Workout.findOneAndDelete({
-      _id: req.params.workoutId,
-      clientId: req.params.clientId
-    });
-    
-    if (!workout) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Workout not found' 
-      });
-    }
-    
-    res.json({
-      success: true,
-      message: 'Workout deleted successfully',
-      data: workout
     });
   } catch (error) {
     res.status(500).json({ 
