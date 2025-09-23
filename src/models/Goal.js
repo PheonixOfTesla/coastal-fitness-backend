@@ -26,7 +26,12 @@ const goalSchema = new mongoose.Schema({
     },
     current: {
         type: Number,
-        required: true
+        required: true,
+        default: 0
+    },
+    startingValue: {
+        type: Number,
+        default: 0
     },
     deadline: {
         type: Date,
@@ -45,7 +50,21 @@ const goalSchema = new mongoose.Schema({
         default: false
     },
     completedDate: Date,
+    scheduledDays: [String],  // For habits
+    completions: {  // For habit tracking
+        type: Map,
+        of: Boolean,
+        default: new Map()
+    },
+    isHabit: {
+        type: Boolean,
+        default: false
+    },
     createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    updatedAt: {
         type: Date,
         default: Date.now
     }
@@ -53,10 +72,33 @@ const goalSchema = new mongoose.Schema({
 
 // Auto-update completed status
 goalSchema.pre('save', function(next) {
-    if (this.current >= this.target && !this.completed) {
+    // Update timestamp
+    this.updatedAt = new Date();
+    
+    // Skip completion check for habits
+    if (this.isHabit) {
+        return next();
+    }
+    
+    // For decrease goals (e.g., lose weight)
+    if (this.startingValue > this.target && this.current <= this.target && !this.completed) {
         this.completed = true;
         this.completedDate = new Date();
     }
+    // For increase goals (e.g., gain muscle)
+    else if (this.startingValue <= this.target && this.current >= this.target && !this.completed) {
+        this.completed = true;
+        this.completedDate = new Date();
+    }
+    // Reset completed if progress reversed
+    else if (this.completed) {
+        if ((this.startingValue > this.target && this.current > this.target) ||
+            (this.startingValue <= this.target && this.current < this.target)) {
+            this.completed = false;
+            this.completedDate = null;
+        }
+    }
+    
     next();
 });
 

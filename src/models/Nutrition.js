@@ -13,20 +13,26 @@ const nutritionSchema = new mongoose.Schema({
         required: true
     },
     protein: {
-        target: Number,
-        current: Number
+        target: { type: Number, default: 0 },
+        current: { type: Number, default: 0 }
     },
     carbs: {
-        target: Number,
-        current: Number
+        target: { type: Number, default: 0 },
+        current: { type: Number, default: 0 }
     },
     fat: {
-        target: Number,
-        current: Number
+        target: { type: Number, default: 0 },
+        current: { type: Number, default: 0 }
     },
     calories: {
-        target: Number,
-        current: Number
+        target: { type: Number, default: 0 },
+        current: { type: Number, default: 0 }
+    },
+    mealPlan: {
+        breakfast: { type: String, default: '' },
+        lunch: { type: String, default: '' },
+        dinner: { type: String, default: '' },
+        snacks: { type: String, default: '' }
     },
     dailyLogs: [{
         date: {
@@ -39,10 +45,20 @@ const nutritionSchema = new mongoose.Schema({
         calories: Number,
         notes: String
     }],
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
     updatedAt: {
         type: Date,
         default: Date.now
     }
+});
+
+// Update the updatedAt timestamp on save
+nutritionSchema.pre('save', function(next) {
+    this.updatedAt = new Date();
+    next();
 });
 
 module.exports = mongoose.model('Nutrition', nutritionSchema);

@@ -5,9 +5,17 @@ exports.getMeasurementsByClient = async (req, res) => {
     const measurements = await Measurement.find({ 
       clientId: req.params.clientId 
     }).sort('-date');
-    res.json(measurements);
+    
+    // FIXED: Consistent response format
+    res.json({
+      success: true,
+      data: measurements
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
@@ -16,11 +24,19 @@ exports.createMeasurement = async (req, res) => {
     const measurement = await Measurement.create({
       ...req.body,
       clientId: req.params.clientId,
-      createdBy: req.user.id
+      createdBy: req.user.id  // FIXED: Use consistent .id instead of req.user._id
     });
-    res.status(201).json(measurement);
+    
+    // FIXED: Consistent response format
+    res.status(201).json({
+      success: true,
+      data: measurement
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
@@ -31,24 +47,49 @@ exports.updateMeasurement = async (req, res) => {
       req.body,
       { new: true, runValidators: true }
     );
+    
     if (!measurement) {
-      return res.status(404).json({ message: 'Measurement not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Measurement not found' 
+      });
     }
-    res.json(measurement);
+    
+    // FIXED: Consistent response format
+    res.json({
+      success: true,
+      data: measurement
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
 exports.deleteMeasurement = async (req, res) => {
   try {
     const measurement = await Measurement.findByIdAndDelete(req.params.id);
+    
     if (!measurement) {
-      return res.status(404).json({ message: 'Measurement not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Measurement not found' 
+      });
     }
-    res.json({ message: 'Measurement deleted' });
+    
+    // FIXED: Consistent response format
+    res.json({ 
+      success: true,
+      message: 'Measurement deleted successfully',
+      data: measurement
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
@@ -59,20 +100,37 @@ exports.getMeasurementStats = async (req, res) => {
     }).sort('date');
     
     if (measurements.length === 0) {
-      return res.json({ message: 'No measurements found' });
+      return res.json({ 
+        success: true,
+        message: 'No measurements found',
+        data: {
+          totalMeasurements: 0,
+          latestWeight: null,
+          weightChange: 0,
+          latestBodyFat: null,
+          bodyFatChange: 0
+        }
+      });
     }
     
     const latest = measurements[measurements.length - 1];
     const first = measurements[0];
     
+    // FIXED: Consistent response format with data wrapper
     res.json({
-      totalMeasurements: measurements.length,
-      latestWeight: latest.weight,
-      weightChange: latest.weight - first.weight,
-      latestBodyFat: latest.bodyFat,
-      bodyFatChange: latest.bodyFat - first.bodyFat
+      success: true,
+      data: {
+        totalMeasurements: measurements.length,
+        latestWeight: latest.weight,
+        weightChange: latest.weight - first.weight,
+        latestBodyFat: latest.bodyFat,
+        bodyFatChange: latest.bodyFat ? (latest.bodyFat - (first.bodyFat || 0)) : 0
+      }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
