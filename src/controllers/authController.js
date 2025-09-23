@@ -1,270 +1,76 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const { Resend } = require('resend');
 
-// STANDARDIZED JWT Token Generation
-const generateToken = (userId, email, roles) => {
-  return jwt.sign(
-    { 
-      id: userId.toString(),        // ALWAYS include 'id'
-      userId: userId.toString(),    // ALWAYS include 'userId'
-      email: email,
-      roles: roles 
-    },
-    process.env.JWT_SECRET || 'your-secret-key-change-this',
-    { expiresIn: '24h' }
-  );
-};
+// Initialize Resend with your API key
+const resend = new Resend('re_U4NdwrQ5_DXyYVHP1RvPHHFbJD4o9cDPb');
 
-// REGISTER NEW USER
-exports.register = async (req, res) => {
-  try {
-    const { name, email, password, roles = ['client'] } = req.body;
-    
-    // Validate required fields
-    if (!email || !password) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Email and password are required' 
-      });
-    }
-    
-    // Check if user exists
-    const userExists = await User.findOne({ email: email.toLowerCase() });
-    if (userExists) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'User already exists' 
-      });
-    }
-    
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    
-    // Create user
-    const user = await User.create({
-      name: name || email.split('@')[0],
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      roles: roles
-    });
-    
-    // Generate token with standardized format
-    const token = generateToken(user._id, user.email, user.roles);
-    
-    // Send response (without password)
-    res.status(201).json({
-      success: true,
-      token: token,
-      user: {
-        _id: user._id,
-        id: user._id, // Both formats for compatibility
-        name: user.name,
-        email: user.email,
-        roles: user.roles
-      }
-    });
-  } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Registration failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-};
+// Add these two functions to your existing authController:
 
-// LOGIN USER
-exports.login = async (req, res) => {
-  try {
-    // Only extract email and password, ignore any other fields
-    const { email, password } = req.body;
-    
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Email and password are required' 
-      });
-    }
-    
-    // Find user and explicitly include password field
-    const user = await User.findOne({ 
-      email: email.toLowerCase() 
-    }).select('+password');
-    
-    if (!user) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid credentials' 
-      });
-    }
-    
-    // Check password using the model's method
-    const isPasswordValid = await user.matchPassword(password);
-    
-    if (!isPasswordValid) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid credentials' 
-      });
-    }
-    
-    // Generate token with standardized format
-    const token = generateToken(user._id, user.email, user.roles);
-    
-    // Update user status
-    user.lastActive = new Date();
-    user.online = true;
-    await user.save();
-    
-    // Send response (without password)
-    res.json({
-      success: true,
-      token: token,
-      user: {
-        _id: user._id,
-        id: user._id, // Both formats for compatibility
-        name: user.name,
-        email: user.email,
-        roles: user.roles
-      }
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Login failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-};
-
-// LOGOUT USER
-exports.logout = async (req, res) => {
-  try {
-    // Update user status if authenticated
-    if (req.user && req.user.userId) {
-      await User.findByIdAndUpdate(req.user.userId, {
-        online: false,
-        lastActive: new Date()
-      });
-    }
-    
-    res.json({ 
-      success: true,
-      message: 'Logged out successfully' 
-    });
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Logout failed' 
-    });
-  }
-};
-
-// REQUEST PASSWORD RESET
 exports.resetPasswordRequest = async (req, res) => {
   try {
     const { email } = req.body;
     
-    if (!email) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Email is required' 
-      });
-    }
-    
     const user = await User.findOne({ email: email.toLowerCase() });
-    
     if (!user) {
-      // Don't reveal if user exists or not
-      return res.json({ 
-        success: true,
-        message: 'If the email exists, a reset link has been sent' 
-      });
+      return res.json({ message: 'If an account exists, reset instructions sent.' });
     }
     
-    // TODO: Implement actual password reset logic here
-    // 1. Generate reset token
-    // 2. Save token to user with expiry
-    // 3. Send email with reset link
+    // Generate 6-digit code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    res.json({ 
-      success: true,
-      message: 'If the email exists, a reset link has been sent' 
+    // Save code to user
+    user.resetPasswordCode = resetCode;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await user.save();
+    
+    // Send email
+    await resend.emails.send({
+      from: 'Coastal Fitness <onboarding@resend.dev>',
+      to: email,
+      subject: 'Password Reset Code - Coastal Fitness',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #244398;">Password Reset</h2>
+          <p>Your password reset code is:</p>
+          <h1 style="color: #244398; font-size: 36px; letter-spacing: 5px;">${resetCode}</h1>
+          <p>This code will expire in 1 hour.</p>
+          <p style="color: #666;">If you didn't request this, please ignore this email.</p>
+        </div>
+      `
     });
+    
+    res.json({ message: 'Reset code sent to email' });
   } catch (error) {
-    console.error('Password reset request error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Password reset request failed' 
-    });
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Error sending reset email' });
   }
 };
 
-// RESET PASSWORD WITH TOKEN
 exports.resetPassword = async (req, res) => {
   try {
-    const { token, newPassword } = req.body;
+    const { resetToken } = req.params; // This is the code
+    const { password } = req.body;
     
-    if (!token || !newPassword) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Token and new password are required' 
-      });
-    }
-    
-    // TODO: Implement actual password reset logic here
-    // 1. Verify reset token
-    // 2. Check token expiry
-    // 3. Hash new password
-    // 4. Update user password
-    // 5. Clear reset token
-    
-    res.json({ 
-      success: true,
-      message: 'Password reset functionality coming soon' 
+    const user = await User.findOne({
+      resetPasswordCode: resetToken,
+      resetPasswordExpires: { $gt: Date.now() }
     });
-  } catch (error) {
-    console.error('Password reset error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Password reset failed' 
-    });
-  }
-};
-
-// VERIFY TOKEN (for checking if user is still authenticated)
-exports.verifyToken = async (req, res) => {
-  try {
-    // The auth middleware should have already verified the token
-    const user = await User.findById(req.user.userId).select('-password');
     
     if (!user) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'User not found' 
-      });
+      return res.status(400).json({ message: 'Invalid or expired code' });
     }
     
-    res.json({
-      success: true,
-      user: {
-        _id: user._id,
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        roles: user.roles
-      }
-    });
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    user.password = hashedPassword;
+    user.resetPasswordCode = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+    
+    res.json({ message: 'Password updated successfully' });
   } catch (error) {
-    console.error('Token verification error:', error);
-    res.status(401).json({ 
-      success: false,
-      message: 'Token verification failed' 
-    });
+    console.error('Password update error:', error);
+    res.status(500).json({ message: 'Error updating password' });
   }
 };
