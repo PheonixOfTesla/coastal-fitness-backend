@@ -40,10 +40,10 @@ const exerciseSchema = new mongoose.Schema({
         trim: true
     },
     grouping: {
-        type: String,
-        enum: ['none', 'superset', 'triset'],
-        default: 'none'
-    },
+    type: String,
+    enum: ['none', 'A', 'B', 'C', 'D'],
+    default: 'none'
+},
     groupId: String,
     groupType: String,
     youtubeLink: String
