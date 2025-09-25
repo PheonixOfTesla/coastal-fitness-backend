@@ -41,7 +41,7 @@ const exerciseSchema = new mongoose.Schema({
     },
     grouping: {
     type: String,
-    enum: ['none', 'A', 'B', 'C', 'D'],
+    enum: ['none', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
     default: 'none'
 },
     groupId: String,
